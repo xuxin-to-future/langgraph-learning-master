@@ -1,0 +1,29 @@
+schema: spec-driven
+
+context: |
+  仓库：langgraph-learning-master — 现以智能客服为主；另规划自研 RAG 中台（不绑定 RAGFlow，仅借鉴能力）。
+  客服包：customer_service/（LangGraph + FastAPI，FAQ 暂为本地关键词+LLM）。
+  RAG 设计参考：docs/superpowers/specs/2026-07-21-self-hosted-rag-mvp.md
+  新包建议：rag_service/（独立 FastAPI，可与客服同仓）。
+  技术：Python 3.10+、FastAPI、SQLite（元数据）、本地文件存储；向量可选（P0 先关键词，向量紧随）。
+  P0：kb、上传入库、切片、索引、retrieve、溯源、health、上传管理页。
+  P1：rerank、文档更新删除、retrieve 过滤、简单评测。
+  文档语言：除代码标识符外使用中文。
+
+rules:
+  proposal:
+    - 对齐 docs/superpowers/specs/2026-07-21-self-hosted-rag-mvp.md 的 P0/P1
+    - 明确非目标（不做 RAGFlow 式控制台/全格式 OCR 等）
+    - 正文使用中文
+  design:
+    - 以独立 rag_service 为中心；客服对接仅预留/适配，不阻塞上传入库
+    - 必须包含可上传文档落成知识库的管理页面
+    - 正文使用中文
+  tasks:
+    - 按 P0 先于 P1；上传页在入库 API 可用后尽快交付
+    - 每项可勾选，尽量不超过约 2 小时
+    - 任务描述使用中文
+  specs:
+    - 使用 SHALL 要求，Scenario + WHEN/THEN（关键字保留英文）
+    - 要求与场景说明使用中文
+    - 覆盖：创建知识库、上传 md/txt、切片就绪、retrieve 命中、管理页上传

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "description": "自研 RAG 黄金集：固定问句 → 期望命中 source/文本关键词",
+  "cases": [
+    {
+      "id": "refund-policy",
+      "query": "退款政策是什么？",
+      "kb_id": "kb_default",
+      "top_k": 5,
+      "methods": ["keyword"],
+      "expect_any_source_contains": ["support-policy", "退款"],
+      "expect_any_text_contains": ["退款"]
+    },
+    {
+      "id": "refund-window",
+      "query": "购买后几天内可以退款？",
+      "kb_id": "kb_default",
+      "top_k": 5,
+      "methods": ["keyword"],
+      "expect_any_text_contains": ["7", "退款"]
+    }
+  ]
+}

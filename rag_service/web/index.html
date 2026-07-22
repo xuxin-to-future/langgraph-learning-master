@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <title>RAG 管理 · 知识库上传</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./css/styles.css?v=2" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="top">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <div>
+            <h1 class="brand-name">RAG 管理</h1>
+            <p class="brand-sub">知识库上传与文档状态</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <a class="nav-back" href="/" title="返回客服对话">← 客服对话</a>
+          <p class="hint-inline" id="api-hint">API · 同域</p>
+        </div>
+      </header>
+
+      <section class="panel" aria-labelledby="kb-heading">
+        <div class="panel-head">
+          <h2 id="kb-heading">知识库</h2>
+        </div>
+        <div class="row">
+          <label class="field grow">
+            <span>选择知识库</span>
+            <select id="kb-select"></select>
+          </label>
+          <button type="button" class="btn ghost" id="refresh-kb-btn">刷新</button>
+        </div>
+        <div class="row create-row">
+          <label class="field grow">
+            <span>新建知识库</span>
+            <input id="kb-name" type="text" placeholder="例如：客服政策" maxlength="80" />
+          </label>
+          <button type="button" class="btn" id="create-kb-btn">创建</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="upload-heading">
+        <div class="panel-head">
+          <h2 id="upload-heading">上传文档</h2>
+          <p class="muted">支持 .md / .txt</p>
+        </div>
+        <form id="upload-form" class="upload-form" autocomplete="off">
+          <label class="field grow">
+            <span>标题（可选）</span>
+            <input id="doc-title" type="text" placeholder="默认使用文件名" maxlength="200" />
+          </label>
+          <label class="field file-field grow">
+            <span>文件</span>
+            <input id="doc-file" type="file" accept=".md,.txt,text/markdown,text/plain" required />
+          </label>
+          <button type="submit" class="btn primary" id="upload-btn">上传入库</button>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="docs-heading">
+        <div class="panel-head">
+          <h2 id="docs-heading">文档列表</h2>
+          <button type="button" class="btn ghost" id="refresh-docs-btn">刷新列表</button>
+        </div>
+        <div class="table-wrap">
+          <table class="docs-table" id="docs-table">
+            <thead>
+              <tr>
+                <th>标题</th>
+                <th>状态</th>
+                <th>切片数</th>
+                <th>时间</th>
+                <th>说明</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="docs-body">
+              <tr class="empty">
+                <td colspan="6">选择知识库后加载文档</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
+    </div>
+
+    <script>
+      // 默认同域；勿再回退到 :8100（统一入口在 :8000）
+      window.RAG_API_BASE = "";
+    </script>
+    <script src="./js/app.js?v=2" defer></script>
+  </body>
+</html>

@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.env
+.idea/
+.vscode/
+*.log
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.png
+.langgraph_api/
+
+# customer_service runtime data
+data/chroma/
+data/*.db
+data/*.sqlite
+!data/.gitkeep
+
+# rag_service runtime data
+data/rag/**
+!data/rag/.gitkeep
+

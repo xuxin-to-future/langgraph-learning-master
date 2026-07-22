@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-07-21
+goal: Deliver FAQ, tickets, HITL escalate, and FastAPI chat endpoints with
+  offline fallback
