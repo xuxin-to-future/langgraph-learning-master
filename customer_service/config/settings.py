@@ -65,10 +65,30 @@ class Settings:
     rag_top_k: int
     rag_rerank: bool
     rag_api_key: str | None
+    # 工单附件 OSS（阿里云）
+    oss_enabled: bool = True
+    oss_access_key_id: str | None = None
+    oss_access_key_secret: str | None = None
+    oss_endpoint: str = "oss-cn-shanghai.aliyuncs.com"
+    oss_bucket: str = ""
+    oss_domain: str = ""
+    oss_path_prefix: str = "cs/"
+    # 会话上下文 token 预算（摘要+最近对话，不含 system/RAG）
+    session_context_token_budget: int = 3500
 
     @property
     def has_openai_key(self) -> bool:
         return bool(self.openai_api_key)
+
+    @property
+    def oss_configured(self) -> bool:
+        return bool(
+            self.oss_enabled
+            and self.oss_access_key_id
+            and self.oss_access_key_secret
+            and self.oss_bucket
+            and self.oss_endpoint
+        )
 
 
 @lru_cache(maxsize=1)
@@ -117,4 +137,17 @@ def get_settings() -> Settings:
         rag_top_k=max(1, min(50, _env_int("RAG_TOP_K", 5))),
         rag_rerank=_env_bool("RAG_RERANK", False),
         rag_api_key=rag_api_key,
+        oss_enabled=_env_bool("OSS_ENABLED", True),
+        oss_access_key_id=(os.getenv("OSS_ACCESS_KEY_ID") or "").strip() or None,
+        oss_access_key_secret=(os.getenv("OSS_ACCESS_KEY_SECRET") or "").strip()
+        or None,
+        oss_endpoint=(
+            os.getenv("OSS_ENDPOINT") or "oss-cn-shanghai.aliyuncs.com"
+        ).strip(),
+        oss_bucket=(os.getenv("OSS_BUCKET") or "").strip(),
+        oss_domain=(os.getenv("OSS_DOMAIN") or "").strip().rstrip("/"),
+        oss_path_prefix=(os.getenv("OSS_PATH_PREFIX") or "cs/").strip() or "cs/",
+        session_context_token_budget=max(
+            512, _env_int("SESSION_CONTEXT_TOKEN_BUDGET", 3500)
+        ),
     )

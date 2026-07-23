@@ -20,6 +20,10 @@ def test_create_then_get_ticket(db_path: Path) -> None:
         subject="无法登录",
         description="提示密码错误",
         session_id="user-42",
+        problem_types=["系统 Bug", "个人反馈"],
+        attachments=["https://example.com/a.png"],
+        rating=2,
+        reporter="admin",
         db_path=db_path,
     )
     assert ticket_id.startswith("TK-")
@@ -32,6 +36,10 @@ def test_create_then_get_ticket(db_path: Path) -> None:
     assert row["status"] == "open"
     assert row["session_id"] == "user-42"
     assert row["created_at"]
+    assert row["problem_types"] == ["系统 Bug", "个人反馈"]
+    assert row["attachments"] == ["https://example.com/a.png"]
+    assert row["rating"] == 2
+    assert row["reporter"] == "admin"
 
 
 def test_get_missing_ticket_returns_none(db_path: Path) -> None:
@@ -39,9 +47,26 @@ def test_get_missing_ticket_returns_none(db_path: Path) -> None:
     assert tickets.get_ticket("TK-DOESNOTEXIST", db_path=db_path) is None
 
 
-def test_create_ticket_requires_subject(db_path: Path) -> None:
+def test_create_ticket_from_description(db_path: Path) -> None:
+    ticket_id = tickets.create_ticket(
+        description="页面打不开",
+        problem_types=["业务问题"],
+        rating=3,
+        db_path=db_path,
+    )
+    row = tickets.get_ticket(ticket_id, db_path=db_path)
+    assert row is not None
+    assert row["subject"] == "页面打不开"
+    assert row["rating"] == 3
+
+
+def test_create_ticket_rejects_bad_rating(db_path: Path) -> None:
     with pytest.raises(ValueError):
-        tickets.create_ticket(subject="  ", description="x", db_path=db_path)
+        tickets.create_ticket(
+            description="x",
+            rating=9,
+            db_path=db_path,
+        )
 
 
 def test_ticket_tools_thin_wrapper(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

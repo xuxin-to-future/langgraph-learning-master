@@ -43,7 +43,7 @@ def create_app(*, graph: Any | None = None) -> FastAPI:
         description="智能客服对话 · 知识库管理（单端口）",
         lifespan=lifespan,
     )
-    app.state.graph = graph if graph is not None else get_compiled_graph()
+    app.state.graph = graph if graph is not None else get_compiled_graph(force_reload=True)
 
     app.add_middleware(
         CORSMiddleware,

@@ -16,6 +16,12 @@
     <div class="page">
       <header class="hero">
         <div class="top-nav">
+          <button type="button" class="nav-link nav-btn" id="new-session-btn" title="新会话">
+            新会话
+          </button>
+          <button type="button" class="nav-link nav-btn" id="feedback-btn" title="提交反馈">
+            提交反馈
+          </button>
           <a class="nav-link" href="/kb/" title="知识库管理">知识库</a>
         </div>
         <div class="brand" aria-hidden="true">
@@ -112,6 +118,103 @@
         />
         <button type="button" class="resume-btn" id="resume-btn">提交并恢复</button>
       </aside>
+
+      <div class="modal-backdrop is-hidden" id="ticket-modal" aria-hidden="true">
+        <div
+          class="modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ticket-modal-title"
+        >
+          <header class="modal-header">
+            <h2 id="ticket-modal-title">提交反馈 / 工单</h2>
+            <button
+              type="button"
+              class="modal-close"
+              id="ticket-modal-close"
+              aria-label="关闭"
+            >
+              ×
+            </button>
+          </header>
+          <form class="ticket-form" id="ticket-form" autocomplete="off">
+            <div class="field">
+              <label for="problem-type-trigger">问题类型 <span class="req">*</span></label>
+              <div class="multi-select" id="problem-type-select">
+                <button
+                  type="button"
+                  class="multi-select-trigger"
+                  id="problem-type-trigger"
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                >
+                  请选择问题类型（可多选）
+                </button>
+                <div class="multi-select-menu is-hidden" id="problem-type-menu" role="listbox">
+                  <label class="multi-option"
+                    ><input type="checkbox" value="业务问题" /> 业务问题</label
+                  >
+                  <label class="multi-option"
+                    ><input type="checkbox" value="系统 Bug" /> 系统 Bug</label
+                  >
+                  <label class="multi-option"
+                    ><input type="checkbox" value="个人反馈" /> 个人反馈</label
+                  >
+                  <label class="multi-option"
+                    ><input type="checkbox" value="功能建议" /> 功能建议</label
+                  >
+                  <label class="multi-option"
+                    ><input type="checkbox" value="其他" /> 其他</label
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="ticket-description"
+                >问题具体描述 <span class="req">*</span></label
+              >
+              <textarea
+                id="ticket-description"
+                name="description"
+                rows="4"
+                placeholder="请详细描述您遇到的问题"
+                required
+              ></textarea>
+            </div>
+
+            <div class="field">
+              <label for="ticket-attachments">附件（仅图片，最多 3 张）</label>
+              <input
+                id="ticket-attachments"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+                multiple
+              />
+              <ul class="attach-preview" id="attach-preview"></ul>
+            </div>
+
+            <div class="field">
+              <span class="field-label">评分 <span class="req">*</span></span>
+              <div class="star-rating" id="star-rating" role="radiogroup" aria-label="评分">
+                <button type="button" class="star" data-value="1" aria-label="1星 很差">★</button>
+                <button type="button" class="star" data-value="2" aria-label="2星 较差">★</button>
+                <button type="button" class="star" data-value="3" aria-label="3星 一般">★</button>
+                <button type="button" class="star" data-value="4" aria-label="4星 较好">★</button>
+                <button type="button" class="star" data-value="5" aria-label="5星 很好">★</button>
+              </div>
+              <p class="rating-hint" id="rating-hint">请选择 1–5 星</p>
+            </div>
+
+            <p class="form-error is-hidden" id="ticket-form-error" role="alert"></p>
+
+            <div class="modal-actions">
+              <button type="button" class="btn-secondary" id="ticket-cancel">取消</button>
+              <button type="submit" class="btn-primary" id="ticket-submit">提交</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <form class="composer" id="composer" autocomplete="off">
         <label class="sr-only" for="message">消息内容</label>
@@ -225,6 +328,6 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-    <script src="./js/app.js" defer></script>
+    <script src="./js/app.js?v=session-1" defer></script>
   </body>
 </html>

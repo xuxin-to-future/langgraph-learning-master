@@ -62,6 +62,9 @@ body {
   position: absolute;
   top: 0;
   right: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .nav-link {
@@ -77,6 +80,11 @@ body {
   text-decoration: none;
   box-shadow: 0 2px 10px rgba(26, 45, 90, 0.05);
   transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button.nav-btn {
+  font: inherit;
+  cursor: pointer;
 }
 
 .nav-link:hover {
@@ -451,6 +459,235 @@ body {
   opacity: 0.55;
   cursor: not-allowed;
   transform: none;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(20, 28, 48, 0.45);
+  animation: rise 0.2s ease both;
+}
+
+.modal-backdrop.is-hidden {
+  display: none;
+}
+
+.modal {
+  width: min(480px, 100%);
+  max-height: min(90vh, 720px);
+  overflow: auto;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+  padding: 18px 18px 16px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.modal-close {
+  border: 0;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px 8px;
+}
+
+.ticket-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ticket-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ticket-form label,
+.ticket-form .field-label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.req {
+  color: #d14343;
+}
+
+.ticket-form textarea,
+.ticket-form input[type="file"] {
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  outline: none;
+}
+
+.ticket-form textarea:focus {
+  border-color: #b8c9f5;
+  box-shadow: 0 0 0 3px rgba(47, 107, 255, 0.12);
+}
+
+.multi-select {
+  position: relative;
+}
+
+.multi-select-trigger {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.multi-select-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.multi-select-menu.is-hidden {
+  display: none;
+}
+
+.multi-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.multi-option:hover {
+  background: var(--brand-soft);
+}
+
+.attach-preview {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attach-preview li {
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: var(--brand-soft);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.star-rating {
+  display: flex;
+  gap: 4px;
+}
+
+.star-rating .star {
+  border: 0;
+  background: transparent;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #d5dbe8;
+  padding: 0 2px;
+  transition: color 0.12s ease, transform 0.12s ease;
+}
+
+.star-rating .star.is-on,
+.star-rating .star.is-hover {
+  color: #f5a623;
+}
+
+.star-rating .star:hover {
+  transform: scale(1.08);
+}
+
+.rating-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.form-error {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #b42318;
+}
+
+.form-error.is-hidden {
+  display: none;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn-primary,
+.btn-secondary {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: #fff;
+}
+
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #eef2f8;
+  color: var(--text);
 }
 
 .sr-only {

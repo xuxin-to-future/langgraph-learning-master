@@ -29,7 +29,7 @@ def create_app(*, graph: Any | None = None) -> FastAPI:
         version="0.1.0",
         description="LangGraph Supervisor 客服演示 API",
     )
-    app.state.graph = graph if graph is not None else get_compiled_graph()
+    app.state.graph = graph if graph is not None else get_compiled_graph(force_reload=True)
 
     app.add_middleware(
         CORSMiddleware,

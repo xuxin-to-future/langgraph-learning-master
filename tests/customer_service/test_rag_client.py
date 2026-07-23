@@ -25,7 +25,8 @@ def http_settings(tmp_path, monkeypatch: pytest.MonkeyPatch) -> Settings:
         openai_base_url=None,
         allow_offline_fallback=True,
         rag_provider="http",
-        rag_base_url="http://127.0.0.1:8100",
+        # 非本机回环，走真实 HTTP 客户端路径（避免进程内直调）
+        rag_base_url="http://rag.example.local:8100",
         rag_kb_id="kb_default",
         rag_top_k=3,
         rag_rerank=False,
@@ -62,6 +63,37 @@ def test_rag_client_retrieve_maps_chunks(http_settings: Settings, monkeypatch: p
     assert body["kb_id"] == "kb_default"
     assert body["top_k"] == 3
     assert body["rerank"] is False
+
+
+def test_rag_client_loopback_uses_inprocess(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    data_dir = tmp_path / "data"
+    s = Settings(
+        knowledge_dir=tmp_path / "knowledge",
+        data_dir=data_dir,
+        tickets_db_path=data_dir / "tickets.db",
+        chroma_dir=data_dir / "chroma",
+        checkpointer_backend="memory",
+        checkpointer_sqlite_path=data_dir / "checkpoints.sqlite",
+        openai_api_key=None,
+        openai_model="dummy",
+        openai_base_url=None,
+        allow_offline_fallback=True,
+        rag_provider="http",
+        rag_base_url="http://127.0.0.1:8000",
+        rag_kb_id="kb_default",
+        rag_top_k=3,
+        rag_rerank=False,
+        rag_api_key=None,
+    )
+    monkeypatch.setattr("customer_service.services.rag_client.get_settings", lambda: s)
+    monkeypatch.setattr(
+        "customer_service.services.rag_client._retrieve_inprocess",
+        lambda query, top_k, kb_id, rerank: [f"[inprocess]\n{query}:{kb_id}:{top_k}:{rerank}"],
+    )
+    docs = rag_client.retrieve("hello")
+    assert docs == ["[inprocess]\nhello:kb_default:3:False"]
 
 
 def test_retrieve_docs_dispatches_http(http_settings: Settings, monkeypatch: pytest.MonkeyPatch) -> None:

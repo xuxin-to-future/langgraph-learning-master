@@ -13,18 +13,8 @@ from customer_service.graph.builder import build_graph
 
 
 @pytest.fixture()
-def force_rules(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _S:
-        has_openai_key = False
-        allow_offline_fallback = True
-        openai_api_key = None
-        openai_model = "dummy"
-        openai_base_url = None
-
-    monkeypatch.setattr(
-        "customer_service.graph.nodes.supervisor.get_settings",
-        lambda: _S(),
-    )
+def force_rules(mock_intent_llm: None) -> None:
+    return None
 
 
 @pytest.fixture()
