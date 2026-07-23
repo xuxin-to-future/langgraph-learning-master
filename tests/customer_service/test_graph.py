@@ -14,20 +14,9 @@ from customer_service.graph.builder import build_graph
 
 
 @pytest.fixture()
-def force_rules(monkeypatch: pytest.MonkeyPatch) -> None:
-    """避免集成测试依赖真实 LLM。"""
-
-    class _S:
-        has_openai_key = False
-        allow_offline_fallback = True
-        openai_api_key = None
-        openai_model = "dummy"
-        openai_base_url = None
-
-    monkeypatch.setattr(
-        "customer_service.graph.nodes.supervisor.get_settings",
-        lambda: _S(),
-    )
+def force_rules(mock_intent_llm: None) -> None:
+    """兼容旧夹具名：改为 mock LLM 意图，不再走生产关键词。"""
+    return None
 
 
 @pytest.fixture()
@@ -65,8 +54,9 @@ def test_graph_ticket_acceptance(force_rules: None, ticket_db: Path) -> None:
     graph = build_graph(checkpointer=MemorySaver())
     result = _invoke(graph, "帮我建一个无法登录的工单", "t-ticket")
     assert result.get("intent") == "ticket"
-    assert result.get("ticket_id", "").startswith("TK-")
-    assert "工单" in (result.get("answer") or "")
+    assert result.get("needs_ticket_form") is True
+    assert not result.get("ticket_id")
+    assert "表单" in (result.get("answer") or "")
 
 
 def test_graph_escalate_interrupt_and_resume(force_rules: None) -> None:
@@ -89,3 +79,40 @@ def test_graph_escalate_interrupt_and_resume(force_rules: None) -> None:
     assert second.get("needs_human") is False
     assert "人工客服已处理" in (second.get("answer") or "")
     assert "已安抚用户" in second["answer"]
+
+
+def test_graph_followup_sets_standalone_query(force_rules: None) -> None:
+    graph = build_graph(checkpointer=MemorySaver())
+    cfg = {"configurable": {"thread_id": "t-follow"}}
+    first = graph.invoke(
+        {"messages": [HumanMessage(content="退款政策是什么？")]},
+        cfg,
+    )
+    assert first.get("intent") == "faq"
+    # 模拟叶子已写入 last_user_question（faq_node 会写）
+    second = graph.invoke(
+        {"messages": [HumanMessage(content="整理成计算公式")]},
+        cfg,
+    )
+    assert second.get("turn_type") == "followup"
+    assert second.get("need_retrieve") is True
+    sq = second.get("standalone_query") or ""
+    assert "退款" in sq or "政策" in sq
+
+
+def test_graph_session_recall(force_rules: None) -> None:
+    graph = build_graph(checkpointer=MemorySaver())
+    cfg = {"configurable": {"thread_id": "t-recall"}}
+    graph.invoke(
+        {"messages": [HumanMessage(content="退款政策是什么？")]},
+        cfg,
+    )
+    second = graph.invoke(
+        {"messages": [HumanMessage(content="我刚才问的是什么")]},
+        cfg,
+    )
+    assert second.get("turn_type") == "session_recall"
+    assert second.get("need_retrieve") is False
+    assert second.get("intent") == "chitchat"
+    assert "退款政策" in (second.get("answer") or "")
+    assert not second.get("retrieved_docs")

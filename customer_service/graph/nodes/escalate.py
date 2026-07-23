@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from langgraph.types import interrupt
+from langchain_core.messages import AIMessage
 
 from customer_service.graph.nodes._message_utils import last_user_text
 from customer_service.models.state import SupportState
@@ -30,8 +31,22 @@ def escalate_node(state: SupportState) -> dict:
     else:
         human_msg = str(resume_value)
 
+    answer = f"人工客服已处理：{human_msg}"
+    from customer_service.services.session_memory import (
+        normalize_session_memory,
+        touch_last_turns,
+    )
+
+    memory = touch_last_turns(
+        normalize_session_memory(state.get("session_memory")),
+        reason,
+        answer,
+    )
     return {
         "needs_human": False,
-        "answer": f"人工客服已处理：{human_msg}",
+        "needs_ticket_form": False,
+        "answer": answer,
         "error": None,
+        "session_memory": memory,
+        "messages": [AIMessage(content=answer)],
     }

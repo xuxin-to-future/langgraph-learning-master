@@ -1,39 +1,32 @@
-"""工单节点。"""
+"""工单节点：引导填写反馈表单（不再自动建单）。"""
 
 from __future__ import annotations
 
+from langchain_core.messages import AIMessage
+
 from customer_service.graph.nodes._message_utils import last_user_text
 from customer_service.models.state import SupportState
-from customer_service.tools.ticket_tools import create_ticket_tool
-
-
-def _subject_from_text(text: str) -> str:
-    t = (text or "").strip()
-    if not t:
-        return "用户反馈"
-    # 截断过长主题
-    return t if len(t) <= 80 else t[:77] + "..."
+from customer_service.services.session_memory import (
+    normalize_session_memory,
+    touch_last_turns,
+)
 
 
 def ticket_node(state: SupportState) -> dict:
-    text = last_user_text(state)
-    subject = _subject_from_text(text)
-    # session_id 若已由 API 写入消息 metadata，一期可留空；后续 builder/API 可扩展
-    session_id = ""
-    try:
-        ticket_id = create_ticket_tool(
-            subject=subject,
-            description=text,
-            session_id=session_id,
-        )
-        return {
-            "ticket_id": ticket_id,
-            "answer": f"已为您创建工单，编号：{ticket_id}。我们会尽快跟进处理。",
-            "error": None,
-        }
-    except Exception as exc:  # noqa: BLE001
-        return {
-            "ticket_id": None,
-            "answer": "工单创建失败，请稍后重试或转人工。",
-            "error": str(exc),
-        }
+    query = last_user_text(state)
+    answer = "检测到您想反馈问题或创建工单，请填写下方表单提交。"
+    memory = touch_last_turns(
+        normalize_session_memory(state.get("session_memory")),
+        query,
+        answer,
+    )
+    return {
+        "ticket_id": None,
+        "retrieved_docs": [],
+        "needs_ticket_form": True,
+        "needs_human": False,
+        "answer": answer,
+        "error": None,
+        "session_memory": memory,
+        "messages": [AIMessage(content=answer)],
+    }

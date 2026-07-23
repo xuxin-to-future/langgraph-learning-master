@@ -15,8 +15,32 @@
   const resumePanel = document.getElementById("resume-panel");
   const resumeInput = document.getElementById("resume-message");
   const resumeBtn = document.getElementById("resume-btn");
+  const feedbackBtn = document.getElementById("feedback-btn");
+  const newSessionBtn = document.getElementById("new-session-btn");
+  const ticketModal = document.getElementById("ticket-modal");
+  const ticketForm = document.getElementById("ticket-form");
+  const ticketModalClose = document.getElementById("ticket-modal-close");
+  const ticketCancel = document.getElementById("ticket-cancel");
+  const ticketSubmit = document.getElementById("ticket-submit");
+  const ticketDescription = document.getElementById("ticket-description");
+  const ticketAttachments = document.getElementById("ticket-attachments");
+  const attachPreview = document.getElementById("attach-preview");
+  const ticketFormError = document.getElementById("ticket-form-error");
+  const problemTypeTrigger = document.getElementById("problem-type-trigger");
+  const problemTypeMenu = document.getElementById("problem-type-menu");
+  const starRating = document.getElementById("star-rating");
+  const ratingHint = document.getElementById("rating-hint");
 
   const API_BASE = (window.CS_API_BASE || "").replace(/\/$/, "");
+  const RATING_LABELS = {
+    1: "很差",
+    2: "较差",
+    3: "一般",
+    4: "较好",
+    5: "很好",
+  };
+  let selectedRating = 0;
+  let pendingFiles = [];
   const MODE_LABEL = {
     fast: "快速咨询",
     expert: "专家协助",
@@ -30,6 +54,24 @@
       localStorage.setItem("cs_session_id", id);
     }
     return id;
+  }
+
+  function resetSession(nextId) {
+    const id = nextId || crypto.randomUUID();
+    localStorage.setItem("cs_session_id", id);
+    if (transcript) transcript.innerHTML = "";
+    showResume(false);
+    closeTicketModal?.();
+    setHint(`已开启新会话 · ${id.slice(0, 8)}…`, true);
+    return id;
+  }
+
+  function applySessionReset(data) {
+    if (!(data?.sessionReset || data?.session_reset)) return false;
+    const sid = data.sessionId || data.session_id;
+    if (sid) resetSession(sid);
+    else resetSession();
+    return true;
   }
 
   function setHint(text, flash = false) {
@@ -181,14 +223,31 @@
   function finishAssistantStream(stream, data) {
     const answer = stream.shown || data.answer || "（无回复）";
     setAssistantBody(stream.body, answer);
+    // 仅 ticket 意图弹表，避免跨轮 needsTicketForm 残留导致「闲聊+请填表单」
+    const showForm = data.intent === "ticket";
     const bits = [`意图: ${data.intent || "-"}`];
+    const turnType = data.turnType || data.turn_type;
+    if (turnType) bits.push(`会话: ${turnType}`);
+    if (data.needRetrieve === false || data.need_retrieve === false) {
+      bits.push("未检索");
+    }
     if (data.ticket_id) bits.push(`工单: ${data.ticket_id}`);
     if (data.needs_human) bits.push("等待人工");
+    if (showForm) bits.push("请填表单");
     if (data.citations?.length) bits.push(`引用: ${data.citations.join(", ")}`);
     stream.meta.textContent = bits.join(" · ");
     stream.el.classList.remove("is-streaming");
     showResume(Boolean(data.needs_human));
-    if (data.needs_human) {
+    if (data.sessionReset || data.session_reset) {
+      const finalAnswer = answer;
+      applySessionReset(data);
+      appendBubble("assistant", finalAnswer || "已开启新会话。", "新会话");
+      return;
+    }
+    if (showForm) {
+      openTicketModal();
+      setHint("请填写反馈表单以创建工单。", true);
+    } else if (data.needs_human) {
       setHint("已转人工：可在下方填写处理说明并恢复会话。", true);
     } else {
       setHint("回复已返回。", true);
@@ -287,16 +346,181 @@
   }
 
   function renderAssistant(data) {
+    if (data.sessionReset || data.session_reset) {
+      applySessionReset(data);
+      appendBubble(
+        "assistant",
+        data.answer || "已开启新会话。",
+        "新会话"
+      );
+      return;
+    }
+    const showForm = data.intent === "ticket";
     const bits = [`意图: ${data.intent || "-"}`];
+    const turnType = data.turnType || data.turn_type;
+    if (turnType) bits.push(`会话: ${turnType}`);
+    if (data.needRetrieve === false || data.need_retrieve === false) {
+      bits.push("未检索");
+    }
     if (data.ticket_id) bits.push(`工单: ${data.ticket_id}`);
     if (data.needs_human) bits.push("等待人工");
+    if (showForm) bits.push("请填表单");
     if (data.citations?.length) bits.push(`引用: ${data.citations.join(", ")}`);
     appendBubble("assistant", data.answer || "（无回复）", bits.join(" · "));
     showResume(Boolean(data.needs_human));
-    if (data.needs_human) {
+    if (showForm) {
+      openTicketModal();
+      setHint("请填写反馈表单以创建工单。", true);
+    } else if (data.needs_human) {
       setHint("已转人工：可在下方填写处理说明并恢复会话。", true);
     } else {
       setHint("回复已返回。", true);
+    }
+  }
+
+  function selectedProblemTypes() {
+    return [...(problemTypeMenu?.querySelectorAll('input[type="checkbox"]:checked') || [])].map(
+      (el) => el.value
+    );
+  }
+
+  function syncProblemTypeLabel() {
+    const types = selectedProblemTypes();
+    if (problemTypeTrigger) {
+      problemTypeTrigger.textContent = types.length
+        ? types.join("、")
+        : "请选择问题类型（可多选）";
+    }
+  }
+
+  function setRating(value) {
+    selectedRating = Number(value) || 0;
+    const stars = starRating?.querySelectorAll(".star") || [];
+    stars.forEach((star) => {
+      const on = Number(star.dataset.value) <= selectedRating;
+      star.classList.toggle("is-on", on);
+    });
+    if (ratingHint) {
+      ratingHint.textContent = selectedRating
+        ? `${selectedRating} 星 · ${RATING_LABELS[selectedRating] || ""}`
+        : "请选择 1–5 星";
+    }
+  }
+
+  function showTicketError(text) {
+    if (!ticketFormError) return;
+    if (text) {
+      ticketFormError.textContent = text;
+      ticketFormError.classList.remove("is-hidden");
+    } else {
+      ticketFormError.textContent = "";
+      ticketFormError.classList.add("is-hidden");
+    }
+  }
+
+  function resetTicketForm() {
+    ticketForm?.reset();
+    selectedRating = 0;
+    pendingFiles = [];
+    setRating(0);
+    syncProblemTypeLabel();
+    if (attachPreview) attachPreview.innerHTML = "";
+    showTicketError("");
+    problemTypeMenu?.classList.add("is-hidden");
+    problemTypeTrigger?.setAttribute("aria-expanded", "false");
+  }
+
+  function openTicketModal() {
+    resetTicketForm();
+    ticketModal?.classList.remove("is-hidden");
+    ticketModal?.setAttribute("aria-hidden", "false");
+    ticketDescription?.focus();
+  }
+
+  function closeTicketModal() {
+    ticketModal?.classList.add("is-hidden");
+    ticketModal?.setAttribute("aria-hidden", "true");
+    problemTypeMenu?.classList.add("is-hidden");
+  }
+
+  function renderAttachPreview() {
+    if (!attachPreview) return;
+    attachPreview.innerHTML = "";
+    pendingFiles.forEach((file) => {
+      const li = document.createElement("li");
+      li.textContent = `${file.name} (${Math.ceil(file.size / 1024)}KB)`;
+      attachPreview.appendChild(li);
+    });
+  }
+
+  async function uploadAttachment(file) {
+    const fd = new FormData();
+    fd.append("file", file);
+    const resp = await fetch(`${API_BASE}/v1/tickets/attachments`, {
+      method: "POST",
+      body: fd,
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const detail = data.detail || resp.statusText || "上传失败";
+      throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+    }
+    return data.url;
+  }
+
+  async function submitTicketForm() {
+    const types = selectedProblemTypes();
+    const description = (ticketDescription?.value || "").trim();
+    if (!types.length) {
+      showTicketError("请至少选择一个问题类型");
+      return;
+    }
+    if (!description) {
+      showTicketError("请填写问题具体描述");
+      return;
+    }
+    if (!selectedRating) {
+      showTicketError("请选择评分");
+      return;
+    }
+
+    showTicketError("");
+    if (ticketSubmit) ticketSubmit.disabled = true;
+    setHint("正在上传附件并创建工单…");
+    try {
+      const urls = [];
+      for (const file of pendingFiles) {
+        urls.push(await uploadAttachment(file));
+      }
+      const resp = await fetch(`${API_BASE}/v1/tickets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          problemTypes: types,
+          description,
+          rating: selectedRating,
+          attachments: urls,
+          sessionId: sessionId(),
+          reporter: "admin",
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        const detail = data.detail || resp.statusText || "创建失败";
+        throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+      }
+      closeTicketModal();
+      appendBubble(
+        "assistant",
+        `已为您创建工单，编号：${data.ticket_id}。我们会尽快跟进处理。`,
+        `工单: ${data.ticket_id} · 评分: ${data.rating || selectedRating}`
+      );
+      setHint(`工单已创建：${data.ticket_id}`, true);
+    } catch (err) {
+      showTicketError(err?.message || String(err));
+      setHint(`提交失败：${err?.message || err}`, true);
+    } finally {
+      if (ticketSubmit) ticketSubmit.disabled = false;
     }
   }
 
@@ -323,7 +547,73 @@
   });
 
   attachBtn?.addEventListener("click", () => {
-    setHint("附件上传尚未接入。", true);
+    openTicketModal();
+    setHint("可通过「提交反馈」或对话触发填写工单表单。", true);
+  });
+
+  feedbackBtn?.addEventListener("click", () => openTicketModal());
+  newSessionBtn?.addEventListener("click", () => {
+    resetSession();
+    appendBubble("assistant", "已开启新会话。之前的对话不会带到这里，请继续提问。", "新会话");
+  });
+  ticketModalClose?.addEventListener("click", () => closeTicketModal());
+  ticketCancel?.addEventListener("click", () => closeTicketModal());
+  ticketModal?.addEventListener("click", (event) => {
+    if (event.target === ticketModal) closeTicketModal();
+  });
+
+  problemTypeTrigger?.addEventListener("click", () => {
+    const open = problemTypeMenu?.classList.toggle("is-hidden") === false;
+    problemTypeTrigger.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  problemTypeMenu?.addEventListener("change", () => syncProblemTypeLabel());
+  document.addEventListener("click", (event) => {
+    const wrap = document.getElementById("problem-type-select");
+    if (wrap && !wrap.contains(event.target)) {
+      problemTypeMenu?.classList.add("is-hidden");
+      problemTypeTrigger?.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  starRating?.querySelectorAll(".star").forEach((star) => {
+    star.addEventListener("mouseenter", () => {
+      const v = Number(star.dataset.value);
+      starRating.querySelectorAll(".star").forEach((s) => {
+        s.classList.toggle("is-hover", Number(s.dataset.value) <= v);
+      });
+    });
+    star.addEventListener("mouseleave", () => {
+      starRating.querySelectorAll(".star").forEach((s) => s.classList.remove("is-hover"));
+    });
+    star.addEventListener("click", () => setRating(star.dataset.value));
+  });
+
+  ticketAttachments?.addEventListener("change", () => {
+    const files = [...(ticketAttachments.files || [])];
+    const next = [];
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        showTicketError("附件只能上传图片");
+        continue;
+      }
+      if (file.size > 2 * 1024 * 1024) {
+        showTicketError("单张图片不能超过 2MB");
+        continue;
+      }
+      next.push(file);
+    }
+    pendingFiles = next.slice(0, 3);
+    if (files.length > 3) {
+      showTicketError("最多上传 3 张图片，已自动截取前 3 张");
+    } else if (pendingFiles.length) {
+      showTicketError("");
+    }
+    renderAttachPreview();
+  });
+
+  ticketForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await submitTicketForm();
   });
 
   composer?.addEventListener("submit", async (event) => {

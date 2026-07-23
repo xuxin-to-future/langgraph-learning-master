@@ -202,15 +202,114 @@ def _load_faq_prompt() -> str:
     return path.read_text(encoding="utf-8")
 
 
+def rewrite_retrieval_query(
+    query: str,
+    conversation_block: str = "",
+) -> str:
+    """把多轮追问改写成可独立检索的完整问句；失败则回退原句。"""
+    q = (query or "").strip()
+    if not q:
+        return q
+    history = (conversation_block or "").strip()
+    if not history:
+        return q
+    if "用户：" not in history and "助手：" not in history and "会话摘要" not in history:
+        return q
+
+    settings = get_settings()
+    if not settings.has_openai_key:
+        return _heuristic_rewrite(q, history)
+
+    try:
+        from langchain_core.messages import HumanMessage, SystemMessage
+        from langchain_openai import ChatOpenAI
+
+        llm = ChatOpenAI(
+            model=settings.openai_model,
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url,
+            temperature=0,
+        )
+        resp = llm.invoke(
+            [
+                SystemMessage(
+                    content=(
+                        "你是检索问句改写器。根据会话上下文，把用户本轮话改写成一条"
+                        "可独立用于知识库检索的完整中文问句。"
+                        "规则：补全省略主语/指代（如「那个」「上面」「整理成」所指对象）；"
+                        "不要回答问题；不要解释；只输出改写后的问句一行。"
+                    )
+                ),
+                HumanMessage(
+                    content=(
+                        f"{history}\n\n"
+                        f"## 用户本轮\n{q}\n\n"
+                        "## 改写后的检索问句"
+                    )
+                ),
+            ]
+        )
+        rewritten = str(getattr(resp, "content", "") or "").strip()
+        rewritten = rewritten.splitlines()[0].strip().strip("`\"'。．")
+        if rewritten and len(rewritten) >= 2:
+            logger.info("retrieval query rewrite: %r -> %r", q[:80], rewritten[:120])
+            return rewritten
+    except Exception:
+        logger.exception("retrieval query rewrite failed")
+
+    return _heuristic_rewrite(q, history)
+
+
+_FOLLOWUP_MARKERS = (
+    "整理",
+    "公式",
+    "归纳",
+    "总结",
+    "详细",
+    "再说",
+    "上面",
+    "那个",
+    "这个",
+    "换个",
+    "写成",
+)
+
+
+def _heuristic_rewrite(query: str, history: str) -> str:
+    """无模型时的弱改写：把最近用户主题拼到本轮追问前。"""
+    last_user = ""
+    last_assistant = ""
+    for line in reversed(history.splitlines()):
+        line = line.strip()
+        if not last_user and line.startswith("用户："):
+            cand = line[len("用户：") :].strip()
+            if cand and cand != query:
+                last_user = cand
+        elif not last_assistant and line.startswith("助手："):
+            last_assistant = line[len("助手：") :].strip()
+        if last_user and last_assistant:
+            break
+    parts: list[str] = []
+    if last_user:
+        parts.append(last_user)
+    elif last_assistant and any(m in query for m in _FOLLOWUP_MARKERS):
+        # 无更早用户问句时，用助手回答开头作主题锚点
+        parts.append(last_assistant[:80])
+    parts.append(query)
+    return " ".join(parts).strip() if parts else query
+
+
 def answer_with_llm(
     query: str,
     docs: list[str],
     *,
     on_token: Callable[[str], None] | None = None,
+    conversation_block: str = "",
 ) -> str | None:
     """用检索片段 + 规范提示词调用大模型生成回答；失败返回 None。
 
     ``on_token`` 若提供，则走 ``llm.stream`` 并逐段回调，便于 SSE 流式输出。
+    ``conversation_block`` 为会话摘要+最近对话，用于多轮指代。
     """
     settings = get_settings()
     if not settings.has_openai_key:
@@ -224,10 +323,26 @@ def answer_with_llm(
             f"### 片段 {i}\n{doc.strip()}" for i, doc in enumerate(docs, start=1)
         )
 
+    history = ""
+    if (conversation_block or "").strip():
+        history = f"## 会话上下文\n{conversation_block.strip()}\n\n"
+
+    followup = any(m in q for m in _FOLLOWUP_MARKERS)
+    instruction = (
+        "## 请作答\n"
+        "本轮是对上文的整理/归纳/公式化/追问：必须先读「会话上下文」里助手刚答过的内容，"
+        "在其基础上结构化改写；知识库片段用于核对事实。禁止装作不知道上文在说什么，"
+        "禁止改口去问「您要整理哪方面」。"
+        if followup and history
+        else "## 请作答\n"
+        "若本轮是对上文的整理/归纳/公式化/补充，必须结合「会话上下文」里助手已答内容与知识库片段；"
+        "不要假装不知道上文在说什么。"
+    )
     user_block = (
-        f"## 用户问题\n{q}\n\n"
+        f"{history}"
+        f"## 用户本轮问题\n{q}\n\n"
         f"## 知识库检索片段\n{context_block}\n\n"
-        "## 请作答"
+        f"{instruction}"
     )
 
     try:
@@ -273,15 +388,40 @@ def answer_faq(
     top_k: int | None = None,
     knowledge_dir: Path | None = None,
     use_llm: bool = True,
+    conversation_block: str = "",
+    search_query: str | None = None,
+    skip_retrieve: bool = False,
 ) -> tuple[str, list[str]]:
-    """检索知识库并生成回答：优先大模型，失败/无 Key 时离线模板。"""
+    """检索知识库并生成回答：优先大模型，失败/无 Key 时离线模板。
+
+    ``search_query``：若提供则直接用于检索（会话层已改写，不再二次 LLM 改写）。
+    ``skip_retrieve``：会话回忆/澄清等场景跳过检索。
+    """
     from customer_service.services.stream_bus import get_token_callback
 
-    docs = retrieve_docs(query, top_k=top_k, knowledge_dir=knowledge_dir)
+    if skip_retrieve:
+        docs: list[str] = []
+    else:
+        q_for_search = (search_query if search_query is not None else query) or ""
+        if search_query is not None:
+            # 会话层已给出独立问句，跳过二次改写
+            docs = retrieve_docs(
+                q_for_search, top_k=top_k, knowledge_dir=knowledge_dir
+            )
+        else:
+            rewritten = rewrite_retrieval_query(query, conversation_block)
+            docs = retrieve_docs(
+                rewritten, top_k=top_k, knowledge_dir=knowledge_dir
+            )
     settings = get_settings()
     on_token = get_token_callback()
     if use_llm and settings.has_openai_key:
-        llm_answer = answer_with_llm(query, docs, on_token=on_token)
+        llm_answer = answer_with_llm(
+            query,
+            docs,
+            on_token=on_token,
+            conversation_block=conversation_block,
+        )
         if llm_answer:
             return llm_answer, docs
         if not settings.allow_offline_fallback:
@@ -290,7 +430,6 @@ def answer_faq(
                 docs,
             )
     offline = answer_with_context(query, docs)
-    # 非流式 LLM 路径（寒暄外的离线 FAQ）也推一次完整文本，方便前端统一渲染
     if on_token and offline:
         on_token(offline)
     return offline, docs

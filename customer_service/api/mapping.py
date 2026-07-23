@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from customer_service.models.schemas import ChatResponse
+from customer_service.models.schemas import ChatResponse, TicketResponse
 from customer_service.models.state import Intent
+from customer_service.services.tickets import RATING_LABELS
 
 
 def citations_from_docs(docs: list[str] | None) -> list[str]:
@@ -40,6 +41,10 @@ def graph_result_to_chat_response(session_id: str, result: dict[str, Any]) -> Ch
             answer=answer,
             ticket_id=result.get("ticket_id"),
             needs_human=True,
+            needsTicketForm=False,
+            sessionReset=False,
+            turnType=result.get("turn_type"),
+            needRetrieve=result.get("need_retrieve"),
             citations=citations_from_docs(result.get("retrieved_docs")),
             error=result.get("error"),
         )
@@ -48,13 +53,19 @@ def graph_result_to_chat_response(session_id: str, result: dict[str, Any]) -> Ch
     if intent is None:
         intent = "chitchat"
 
+    # 表单仅随本轮 ticket 意图出现，杜绝跨轮状态串扰
+    needs_form = intent == "ticket"
     return ChatResponse(
         sessionId=session_id,
         intent=intent,
         answer=result.get("answer") or "",
-        ticket_id=result.get("ticket_id"),
-        needs_human=bool(result.get("needs_human")),
-        citations=citations_from_docs(result.get("retrieved_docs")),
+        ticket_id=None if needs_form else result.get("ticket_id"),
+        needs_human=bool(result.get("needs_human")) and intent == "escalate",
+        needsTicketForm=needs_form,
+        sessionReset=bool(result.get("session_reset")),
+        turnType=result.get("turn_type"),
+        needRetrieve=result.get("need_retrieve"),
+        citations=[] if needs_form else citations_from_docs(result.get("retrieved_docs")),
         error=result.get("error"),
     )
 
@@ -66,3 +77,21 @@ def parse_ticket_created_at(value: str | None) -> datetime | None:
         return datetime.fromisoformat(value)
     except ValueError:
         return None
+
+
+def ticket_row_to_response(row: dict[str, Any]) -> TicketResponse:
+    rating = row.get("rating")
+    label = RATING_LABELS.get(rating) if isinstance(rating, int) else None
+    return TicketResponse(
+        ticket_id=row["ticket_id"],
+        subject=row["subject"],
+        description=row.get("description") or "",
+        status=row.get("status") or "open",
+        sessionId=row.get("session_id"),
+        created_at=parse_ticket_created_at(row.get("created_at")),
+        problemTypes=list(row.get("problem_types") or []),
+        attachments=list(row.get("attachments") or []),
+        rating=rating,
+        ratingLabel=label,
+        reporter=row.get("reporter") or "admin",
+    )
